@@ -1,6 +1,9 @@
 2020年5月4日にやったPeCa勉強会です。
 
 ## 1. 30 MINUTES MISSIONの紹介
+
+[資料(about30mm.pdf)](about30mm.pdf)
+
 ### 発表者
 あれくま
 
@@ -17,6 +20,9 @@ BANDAI SPIRITSから発売中のプラモシリーズ 30 MINUTES MISSIONSにつ�
 みんな参加してね
 
 ## 2. 音声認識格闘録
+
+[資料(voice_recognize_slide.pdf)](voice_recognize_slide.pdf)
+
 ### 発表者
 ふぃるみすと
 
