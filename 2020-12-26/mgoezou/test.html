@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Title</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+    <style type="text/css">
+      @import url(http://fonts.googleapis.com/css?family=Yanone+Kaffeesatz);
+      @import url(http://fonts.googleapis.com/css?family=Droid+Serif:400,700,400italic);
+      @import url(http://fonts.googleapis.com/css?family=Ubuntu+Mono:400,700,400italic);
+
+      body { font-family: 'Droid Serif';}
+      h1, h2, h3 {
+        font-family: 'Yanone Kaffeesatz';
+        font-weight: normal;
+      }
+      .remark-code, .remark-inline-code { font-family: 'Ubuntu Mono'; }
+      .remark-slide-content { font-size: 36px; }
+    </style>
+  </head>
+  <body>
+    <textarea id="source">
+
+layout: true
+background-image: url(fu-n.png)
+
+---
+
+#Common Lispのformat関数で使われる制御シーケンス
+もげぞうβ
+
+---
+
+
+CLにはテキストを表示する関数にformatというものがある
+
+--
+
+```lisp
+(format t "~d円くれ" 30000)
+```
+
+--
+
+```lisp
+30000円くれ
+NIL
+```
+---
+
+```lisp
+(format t "~d円くれ" 30000)
+```
+* 第一引数
+  * t : 結果をコンソールに出力。返り値はnil
+  * nil : 出力する代わりに、テキストを文字列として返す
+  * stream : データをストリームに出力する
+
+---
+```lisp
+(format t "~d円くれ" 30000)
+```
+* 第二引数
+  * 制御文字列
+* 第三引数
+  * 値引数
+
+
+
+---
+
+今回は第二引数で使われる~で始まる制御シーケンスと呼ばれるものを紹介する。
+(format指定子とか変換指定子ともいうらしい)
+---
+
+* ~a, ~s
+
+```lisp
+(format t "これは ~a と ~a" "hoge" #\a)
+これは hoge と a
+(format t "これは ~s と ~s" "hoge" #\a)
+これは "hoge" と #\a
+```
+lispが後から読み込めるような区切り文字が入ってるか入ってないかの違い
+---
+
+制御シーケンスにはパラメータを与えることができる
+aやsの前に整数nを置くと最小幅の指定になる
+```lisp
+(format t "幅~10aあるよ" "hoge")
+幅hoge      あるよ
+```
+右詰めしたいときは@を加える
+```lisp
+(format t "幅~10@aあるよ" "hoge")
+幅      hogeあるよ
+```
+---
+
+パラメータはカンマで区切って複数与えることもできる
+
+```lisp
+(format t "ほぼ~10,4a使わない" "hoge")
+ほぼhoge        使わない
+```
+この場合4文字分づつ10文字以上になるまでパディングするという意味
+なので上の場合は12文字分パディングされてる
+
+---
+
+値引数の文字数にかかわらず、パディング文字数の下限を指定したい時は~aのパラメータの3番目に指定する。
+```lisp
+(format t "空白~,,4aおくよ" "foo")
+空白foo    おくよ
+```
+これはfooの後ろに4文字分空白を置く
+(パラメータはカンマだけで省略できる)
+---
+
+四番目のパラメータではパディング文字を指定できる
+```lisp
+(format t "文字~,,4,'!a指定できる" "foo")
+文字foo!!!!指定できる
+```
+パディング文字に!を指定した
+パディング文字を左にしたい場合は@を付ける
+```lisp
+(format t "文字~,,4,'!@a指定できる" "foo")
+文字!!!!foo指定できる
+```
+
+
+---
+
+* ~d, ~b, ~x,整数の整形
+
+```lisp
+(format t "1000は2進数で~b" 1000)
+1000は2進数で1111101000
+(format t "1000は10進数で~d" 1000)
+1000は10進数で1000
+(format t "1000は16進数で~x" 1000)
+1000は16進数で3E8
+```
+---
+1番目のパラメータでパディング数
+2番目のパラメータでパディング文字を指定できる
+```lisp
+(format t "空白~10dだよ" 1000)
+空白      1000だよ
+(format t "空白~10,'xdだよ" 1000)
+空白xxxxxx1000だよ
+```
+
+---
+* ~f,浮動小数点の整形
+~fの一番目のパラメータで表示幅を指定
+```lisp
+(format t "パイ:~4f" pi)
+パイ:3.14
+```
+~fの二番目のパラメータで小数点以下の桁数を指定
+```lisp
+(format t "パイ:~,4f" pi)
+パイ:3.1416
+```
+
+---
+
+~fの三番目のパラメータは整数nを渡すと
+10のn乗された値が表示される
+```lisp
+(format t "パイ:~5,,2f" pi)
+パイ:314.2
+```
+10の2乗されたpi
+---
+* ~%,~& 改行
+
+~%
+```lisp
+(progn (format t "ほげ~%")
+       (format t "~%もげ"))
+ほげ
+
+もげ
+```
+~&
+```lisp
+(progn (format t "ほげ~&")
+       (format t "~&もげ"))
+ほげ
+もげ
+```
+---
+1番目のパラメータで空行の数を指定できる
+```lisp
+(format t "ほげ~5%もげ")
+ほげ
+
+
+
+
+もげ
+```
+---
+* テキストを揃える
+
+```lisp
+(defun random-animal ()
+  (nth (random 5) '("dog" "tick" "tiger" "walrus" "kangaroo")))
+
+(random-animal)
+"tick"
+```
+ランダムで動物名を表示する関数
+全角文字だと怪しいので半角文字で
+
+---
+* ~t
+
+表示するテキストのカラム位置を指定
+```lisp
+(loop :repeat 5
+  :do (format t "~5t~a ~15t~a ~25t~a"
+              (random-animal) (random-animal) (random-animal)))
+
+
+     walrus    tiger     tiger
+     dog       tick      kangaroo
+     walrus    kangaroo  tick
+     tiger     tick      walrus
+     dog       kangaroo  tiger
+```
+---
+
+一行の中に出てくるテキストがなるべく等しい距離になるように表示
+
+
+```lisp
+(loop :repeat 5
+  :do (format t "~30<~a~;~a~;~a~>~%"
+              (random-animal) (random-animal) (random-animal)))
+
+dog      kangaroo       walrus
+tiger      kangaroo      tiger
+kangaroo     walrus      tiger
+tick         tiger         dog
+dog       tiger       kangaroo
+```
+
+---
+
+* "~30<~a~;~a~;~a~>~%"
+ * ~30< : 文字揃え開始、全体で30文字分の幅を取る
+ * ~a : 値表示
+ * ~; : 新たにそろえる値を開始
+ * ~> : 文字揃え終了
+ * ~% : 改行
+
+---
+
+~<に:@をつけるとセンター揃えしてくれる  
+
+```lisp  
+(loop :repeat 5
+      :do (format t "~30:@<~a~;~a~;~a~>~%"
+                  (random-animal) (random-animal) (random-animal)))
+
+  kangaroo  tick   kangaroo   
+   tick    tiger    walrus    
+  walrus   kangaroo   tiger   
+   dog    kangaroo    tick    
+    tiger    tick    tick     
+```
+---
+* 列毎に10文字ずつのセンタリングを指定すると  
+
+```lisp
+(loop :repeat 5
+      :do (format t "~10:@<~a~>~10:@<~a~>~10:@<~a~>~%"
+                  (random-animal) (random-animal) (random-animal)))
+  walrus    tiger     tiger   
+   dog       tick    kangaroo 
+  walrus   kangaroo    tick   
+  tiger      tick     walrus  
+   dog     kangaroo   tiger   
+
+```
+---
+* 繰り返し ~{ ~}  
+
+ループしてくれる制御シーケンスもある
+```lisp
+(defvar *animals* '("犬" "猫" "牛" "豚" "鳥" "羊" "狼" "ネズミ"))
+(format t "~{~aだ！ ~}" *animals*)
+犬だ！ 猫だ！ 牛だ！ 豚だ！ 鳥だ！ 羊だ！ 狼だ！ ネズミだ！
+
+```
+---
+リストから値を複数とることもできる  
+```lisp
+(format t "~{~aか？いや~aだ！~%~}" *animals*)
+犬か？いや猫だ！
+牛か？いや豚だ！
+鳥か？いや羊だ！
+狼か？いやネズミだ！
+```
+---
+参考文献　Land of Lisp
+---
+
+    </textarea>
+    <script src="http://gnab.github.io/remark/downloads/remark-latest.min.js" type="text/javascript">
+    </script>
+    <script type="text/javascript">
+      var slideshow = remark.create();
+    </script>
+  </body>
+</html>
