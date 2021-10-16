@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>dotnetasync3</title>
+  <style>
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    span.underline{text-decoration: underline;}
+    div.column{display: inline-block; vertical-align: top; width: 50%;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    ul.task-list{list-style: none;}
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    .sourceCode { overflow: visible; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        color: #aaaaaa;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+    div.sourceCode
+      {   }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+    code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+    code span.at { color: #7d9029; } /* Attribute */
+    code span.bn { color: #40a070; } /* BaseN */
+    code span.bu { } /* BuiltIn */
+    code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #4070a0; } /* Char */
+    code span.cn { color: #880000; } /* Constant */
+    code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+    code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+    code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+    code span.dt { color: #902000; } /* DataType */
+    code span.dv { color: #40a070; } /* DecVal */
+    code span.er { color: #ff0000; font-weight: bold; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #40a070; } /* Float */
+    code span.fu { color: #06287e; } /* Function */
+    code span.im { } /* Import */
+    code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+    code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+    code span.op { color: #666666; } /* Operator */
+    code span.ot { color: #007020; } /* Other */
+    code span.pp { color: #bc7a00; } /* Preprocessor */
+    code span.sc { color: #4070a0; } /* SpecialChar */
+    code span.ss { color: #bb6688; } /* SpecialString */
+    code span.st { color: #4070a0; } /* String */
+    code span.va { color: #19177c; } /* Variable */
+    code span.vs { color: #4070a0; } /* VerbatimString */
+    code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/spcss" />
+  <!--[if lt IE 9]>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/html5shiv/3.7.3/html5shiv-printshiv.min.js"></script>
+  <![endif]-->
+</head>
+<body>
+<h1 id="netの非同期処理-第3回">.NETの非同期処理 第3回</h1>
+<p>by あれくま</p>
+<hr />
+<h1 id="前回のおさらい">前回のおさらい</h1>
+<p>.NET では Task を使うと比較的安全に非同期処理の待ち合わせと戻り値の取得ができました。</p>
+<p>ただ、続きの処理を追加するにはContinueWithでコールバックを追加していかなければならず、コールバック地獄になってしまうのでした。</p>
+<p>たとえば、指定した動画ファイルをダウンロードしてffmpegで再エンコードして指定のフォルダに移動する、という処理を非同期で行いたいとします。</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode cs"><code class="sourceCode cs"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co">/// 指定した動画ファイルをダウンロードしてffmpegで再エンコードして指定のフォルダに移動する、という処理を非同期で行いたいとします。</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>Task <span class="fu">DownloadAndEncodeAsync</span>(Uri sourceUri, <span class="dt">string</span> targetFolder)</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>{</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>  <span class="co">//なんか非同期でファイルをダウンロードしてくれるメソッド</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>  <span class="co">//結果にダウンロードしたファイル名が入ってくる</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>  Task&lt;<span class="dt">string</span>&gt; downloadTask = <span class="fu">DownloadFileAsync</span>(sourceUri);</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>  <span class="co">//ダウンロードが終わったあとの処理を追加する</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>  Task&lt;Task&gt; withEncodeAndMoveTask = downloadTask.<span class="fu">ContinueWith</span>(prev =&gt; {</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>    <span class="co">//prevには前のタスク(ここではdownloadTaskと同じ)が入ってるので結果を取り出す</span></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>    <span class="dt">string</span> downloadedFile = prev.<span class="fu">Result</span>;</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>    <span class="co">//なんかffmepgを非同期で起動してでエンコードしてくれるメソッド</span></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>    Task&lt;<span class="dt">int</span>&gt; encodeTask = <span class="fu">EncodeWithFFMPEGAsync</span>(downloadedFile);</span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>    <span class="co">//エンコードが終わったあとの処理を追加する</span></span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a>    <span class="co">//追加の処理までの結果を待てるTaskを返すよ</span></span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a>    Task withMoveTask = encodeTask.<span class="fu">ContinueWith</span>(prev2 =&gt; {</span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a>      <span class="co">//prev2には前のタスク(ここではencodeTaskと同じ)が入ってる</span></span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a>      <span class="kw">if</span> (prev2.<span class="fu">Result</span>==<span class="dv">0</span>) {</span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a>        <span class="co">//正常終了してたらtargetFolderに移動する</span></span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a>        File.<span class="fu">Move</span>(file, Path.<span class="fu">Join</span>(targetFolder, downloadedFile));</span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a>      }</span>
+<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a>      <span class="kw">else</span> {</span>
+<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a>        <span class="co">//失敗してたらなんか表示しよう</span></span>
+<span id="cb1-26"><a href="#cb1-26" aria-hidden="true" tabindex="-1"></a>        Console.<span class="fu">WriteLine</span>($<span class="st">&quot;失敗しました: {downloadedFile}&quot;</span>);</span>
+<span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a>      }</span>
+<span id="cb1-28"><a href="#cb1-28" aria-hidden="true" tabindex="-1"></a>    });</span>
+<span id="cb1-29"><a href="#cb1-29" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-30"><a href="#cb1-30" aria-hidden="true" tabindex="-1"></a>    <span class="co">//ファイルのエンコードと移動を待つタスクを返す</span></span>
+<span id="cb1-31"><a href="#cb1-31" aria-hidden="true" tabindex="-1"></a>    <span class="kw">return</span> withMoveTask;</span>
+<span id="cb1-32"><a href="#cb1-32" aria-hidden="true" tabindex="-1"></a>  });</span>
+<span id="cb1-33"><a href="#cb1-33" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-34"><a href="#cb1-34" aria-hidden="true" tabindex="-1"></a>  <span class="co">//全部終わったら完了となるTaskを返す</span></span>
+<span id="cb1-35"><a href="#cb1-35" aria-hidden="true" tabindex="-1"></a>  <span class="co">//Unwrap() を呼ぶと中のTaskが終わったら終わるTaskに変換してくれる</span></span>
+<span id="cb1-36"><a href="#cb1-36" aria-hidden="true" tabindex="-1"></a>  <span class="kw">return</span> withEncodeAndMoveTask.<span class="fu">Unwrap</span>();</span>
+<span id="cb1-37"><a href="#cb1-37" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<p>やってることは非同期でダウンロードを実行する→終わったら非同期でエンコードを実行する→終わったらファイルを移動する、とまあそんなに難しい話ではないんですが、やけに複雑なことになっています。これが待つ非同期操作が2つなのでこんなもんなんですが、非同期操作が増えれば増えるほどコールバックが増えていき混乱するコードになってしまいます。</p>
+<p>今回はこの続きで、もっと簡単に使える機能の紹介です。</p>
+<h1 id="asyncawait">async/await</h1>
+<p><code>Task</code>での非同期操作をもっと手軽に使えるようにC#に追加された機能が<code>async</code>/<code>await</code>です。 これは.NETの機能ではなくC#の機能なので.NETの他の言語では使えません(似たような機能はだいたいあります)。</p>
+<p>まず<code>async</code>についてですが、これはメソッドの宣言やラムダ式の仮引数リストの前に書きます。</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode cs"><code class="sourceCode cs"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>async Task <span class="fu">DownloadAndEncodeAsync</span>(Uri sourceUri, <span class="dt">string</span> targetFolder)</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>{</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>  ～</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>Func&lt;<span class="dt">string</span>, <span class="dt">string</span>, Task&gt; func = <span class="fu">async</span> (hoge, fuga) =&gt; { ～ };</span></code></pre></div>
+<p>上のように宣言の頭につけます。これを付けるとどうなるかというと……実はどうにもなりません。この<code>async</code>は、メソッドやラムダ式の中で<code>await</code>を使うことを宣言しているだけで、これが付いてるだけでは動作に変わりはありません。ラムダ式の場合は戻り値の型が<code>Task</code>や<code>Task&lt;T&gt;</code>に推論されるように変わりますが。 まあ中で<code>await</code>を使うなら<code>async</code>を付ける必要があるってことです。 <code>async</code>を付けた場合は<code>Task</code>や<code>Task&lt;T&gt;</code>などのTaskライクな型(<code>ValueTask</code>とか)か<code>void</code>しか戻り値の型に指定できなくなります。それ以外の型を指定してもコンパイルエラーになります。とはいえ中の動作に違いがあるわけではありませんね。 ちなみに<code>async</code>はメソッド(やラムダ式)の型情報に含まれません。<code>async Task HogeAsync()</code>と<code>Task HogeAsync()</code>の型は全く同じです。<code>async</code>は本当にこの中でこれから<code>await</code>を使いますよという実装上のヒントにすぎないのです。</p>
+<p>本命は<code>await</code>です。次のようにして使います。</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode cs"><code class="sourceCode cs"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>async Task <span class="fu">DownloadAndEncodeAsync</span>(Uri sourceUri, <span class="dt">string</span> targetFolder)</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>{</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>  <span class="co">//なんか非同期でファイルをダウンロードしてくれるメソッド</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>  <span class="co">//結果にダウンロードしたファイル名が入ってくる</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>  <span class="dt">string</span> downloadedFile = await <span class="fu">DownloadFileAsync</span>(sourceUri);</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>  <span class="co">//なんかffmepgを非同期で起動してでエンコードしてくれるメソッド</span></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>  <span class="dt">int</span> encodeResult = await <span class="fu">EncodeWithFFMPEGAsync</span>(downloadedFile);</span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>  <span class="kw">if</span> (encodeResult==<span class="dv">0</span>) {</span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>    <span class="co">//正常終了してたらtargetFolderに移動する</span></span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>    File.<span class="fu">Move</span>(file, Path.<span class="fu">Join</span>(targetFolder, downloadedFile));</span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>  <span class="kw">else</span> {</span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>    <span class="co">//失敗してたらなんか表示しよう</span></span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a>    Console.<span class="fu">WriteLine</span>($<span class="st">&quot;失敗しました: {downloadedFile}&quot;</span>);</span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<p>前回のおさらいで見たコードとほぼ同じ動作をしているんですが、行数がなんと半分になっていますね。 非同期操作のためにいろいろと複雑なことをしていたのが綺麗さっぱり無くなって、非同期メソッドの呼び出し前に<code>await</code>が付いただけであとは普通のメソッド呼び出しのように見えます。</p>
+<p>これですっきり万事解決！と言いたいところですが、実際使おうとするといろいろと悩むところが出てきます。</p>
+<p>まずどう考えても悩ましいのは、<code>async</code>メソッドの戻り値は<code>void</code>か<code>Task</code>(および<code>Task&lt;T&gt;</code>)型でないといけないことです。 このメソッドを呼び出す側は<code>Task</code>を返されますので、こいつをどうにか待たないといけないんですが、<code>Task</code>を待つのに手軽なのは<code>await</code>を使うことです。<code>await</code>を使うには<code>async</code>メソッドでないといけませんね。ということは<code>async</code>メソッドを呼び出す側も<code>async</code>メソッドにして<code>Task</code>を返さないといけません。……ということを繰り返していくと<code>Main</code>まで全部<code>async</code>にしないといけないんですか!?という話になってしまいます。マジで？めんどくさくね？と思ってしまうのですが、これは本当にそうするしかありません。<code>async</code>メソッドを使うと、<code>Main</code>まで<code>async</code>メソッドになる可能性はありますし、そんなにおかしな話ではありません。</p>
+<p>(実際には<code>await</code>以外に<code>Task.Result</code>や<code>Task.Wait()</code>で待つことも可能なのですが、場合によっては謎のデッドロックが発生するのでやめておきましょう。)</p>
+<p><code>async</code>メソッドの戻り値を<code>void</code>型にした場合はどうなってしまうのでしょうか？というかなんで<code>void</code>だけ許されてるんでしょうか。 まずどういう動きをするかですが、戻り値を<code>Task</code>型にしたのと同じ動作をします。ただし戻り値の<code>Task</code>は受け取れないので完了待ち(や例外発生時の処理)はできません。 つまり戻り値を<code>Task</code>型にしつつ、その戻り値を無視するのと同じになります。</p>
+<p>次に何故<code>void</code>に指定できるかですが、これはイベントハンドラのためのものです。 イベントハンドラは通常次のような型のメソッド(やラムダ式)を指定する必要があります。</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode cs"><code class="sourceCode cs"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="dt">void</span> <span class="fu">button1_Click</span>(<span class="dt">object</span> sender, EventArgs args)</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>{</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>  ～</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<p>このイベントハンドラの中で非同期操作を待とうとしたら<code>async</code>をつけたいですが、戻り値を<code>Task</code>型にしてしまうと型が違ってイベントに登録できなくなってしまいます。 そのため戻り値に<code>void</code>だけは特別扱いで指定できるようになっています。 イベントはハンドラの完了を待ってから他の操作をしたりとか、例外の処理をしたりとか通常しないので<code>void</code>でもまあいいやってことですね。 べつにイベントハンドラでの利用に限ったものではないので他のところで<code>void</code>を指定することもできるのですが、特に互換性でどうしようもないなどの理由がなければ<code>Task</code>を返す方を使いましょう。</p>
+<p>よし、もう完璧だな！<code>Task</code>を待つのには<code>await</code>を使おう、必要なところは全部<code>async</code>メソッドにしよう、イベントハンドラの場合は<code>void</code>を返す<code>async</code>メソッドにしよう、これだけ覚えれば問題ないですね。これにて終了です。はい解散。</p>
+<h1 id="asyncawait-の闇">async/await の闇</h1>
+<p>ここからは大変な話をします。</p>
+<h2 id="混ぜるな危険">混ぜるな危険</h2>
+<p>まずなんの変哲もない次のコードを見てください。</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode cs"><code class="sourceCode cs"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>async Task&lt;<span class="dt">string</span>&gt; <span class="fu">ReadFileAsStringAsync</span>(<span class="dt">string</span> filename)</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>{</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>  Debug.<span class="fu">WriteLine</span>($<span class="st">&quot;ファイルを読み込みます: {filename}&quot;</span>);</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>  <span class="dt">var</span> result = await File.<span class="fu">ReadAllTextAsync</span>(filename);</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>  Debug.<span class="fu">WriteLine</span>($<span class="st">&quot;ファイル読み込み完了: {filename}&quot;</span>);</span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>  <span class="kw">return</span> result;</span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a><span class="dt">void</span> <span class="fu">Button1_Click</span>(<span class="dt">object</span> sender, EventArgs e)</span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>{</span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>  <span class="dt">string</span> result = <span class="fu">ReadFileAsStringAsync</span>(<span class="st">&quot;hoge.txt&quot;</span>).<span class="fu">Result</span>;</span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>  label1.<span class="fu">Text</span> = result;</span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<p>ボタンをクリックするとテキストファイルを読み込んでラベルに表示しようとしています。</p>
+<p>これを実行すると……フリーズします。さようなら。 なんでフリーズするのかというとデッドロックが起きてるんですが、おそろしいことにデッドロックが起きていることがコード上からはさっぱり読み取れません。</p>
+<p>説明はこれからやるんですが、非常に複雑になるのでとりあえず回避方法だけ説明しておきます。</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode cs"><code class="sourceCode cs"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>async <span class="dt">void</span> <span class="fu">Button1_Click</span>(<span class="dt">object</span> sender, EventArgs e)</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>{</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  <span class="dt">string</span> result = await <span class="fu">ReadFileAsStringAsync</span>(<span class="st">&quot;hoge.txt&quot;</span>);</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>  label1.<span class="fu">Text</span> = result;</span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<p><code>Task.Result</code>で完了待ちをしていたところを<code>await</code>に置き換えただけです。これが非常に重要で、GUIアプリケーションで<code>Task</code>の完了待ちをするには<code>Task.Result</code>や<code>Task.Wait()</code>などで同期待ちをやらないで<code>await</code>で待つようにしてください。</p>
+<h2 id="うっかりデッドロック">うっかりデッドロック</h2>
+<p>なぜデッドロックが起きるのでしょうか？</p>
+<p>まずなんの変哲もない次の非同期メソッドを見てください。</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode cs"><code class="sourceCode cs"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>async Task&lt;<span class="dt">string</span>&gt; <span class="fu">ReadFileAsStringAsync</span>(<span class="dt">string</span> filename)</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>{</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>  Debug.<span class="fu">WriteLine</span>($<span class="st">&quot;ファイルを読み込みます: {filename}&quot;</span>); <span class="co">// ①</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>  <span class="dt">var</span> result = await File.<span class="fu">ReadAllTextAsync</span>(filename); <span class="co">// ②</span></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>  Debug.<span class="fu">WriteLine</span>($<span class="st">&quot;ファイル読み込み完了: {filename}&quot;</span>); <span class="co">// ③</span></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>  <span class="kw">return</span> result;</span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<p><code>await</code>より前にある部分(①)と後にある部分(③)がありますね。②は非同期メソッドの中身を指しているつもりです。 これらは実際どのスレッドで実行されるのでしょうか？</p>
+<p>①ですが、これは呼び出し元のスレッドで呼び出されます。<code>async</code>が付いてないメソッドと同じです。</p>
+<p>②の中身ですが、どこでどう実行されるかはわかりません。というのも中身によるからですね。 まあここは気にしなくてよくて、どこでどう実行されるかはわからないが、<code>await</code>が終わったときには全部完了しているというのは保証されているので気にしなくてかまいません。</p>
+<p>③は、どのスレッドで実行されるかわかりません。 呼び出し元のスレッドで実行されるかもしれませんし、全然関係ないどこかのスレッドで実行されるかもしれません。 デッドロックに関係するのはこの部分で、どのスレッドで実行されるは実は全くわからないわけではなく<code>SynchronizationContext.Current</code>というグローバル変数(というかスレッドローカル変数)で決まります。 呼び出し前に<code>SynchronizationContext.Current</code>が何に設定されていたかで、どのスレッドで実行されるかが決まるのです。</p>
+<p><code>SynchronizationContext</code>というのは何をするクラスかというと、別スレッドからあるスレッドに処理をぶん投げるのに使われます。 たとえばGUIアプリケーションだとたいていメインスレッドからしかコントロールにアクセスできません。 そのため別スレッドからコントロールにアクセスする処理を実行したい場合は、Windows.Formsだと<code>Control.BeginInvoke()</code>、WPFだと<code>Dispatcher.BeginInvoke()</code>を使ってコントロールのあるスレッド上で渡した処理を実行させます。 これを抽象化したのが<code>SynchronizationContext</code>で、<code>SynchronizationContext.Post()</code>に処理を渡すと、Windows.FormsだろうがWPFだろうがいい感じにメインスレッドで処理を実行してくれます。</p>
+<p>ちなみにGUIアプリケーション以外のコンソールアプリやASP.NET Coreのアプリでは<code>SynchronizationContext.Current</code>は<code>null</code>になっており、デフォルトのものが使われます。 デフォルトではスレッドプール上で処理を実行するので、メインスレッド以外のどこかのスレッドで実行されることになります。</p>
+<p>それを踏まえてもう一度デッドロックするコードを見てみましょう</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode cs"><code class="sourceCode cs"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="dt">void</span> <span class="fu">Button1_Click</span>(<span class="dt">object</span> sender, EventArgs e)</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>{</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>  <span class="dt">string</span> result = <span class="fu">ReadFileAsStringAsync</span>(<span class="st">&quot;hoge.txt&quot;</span>).<span class="fu">Result</span>; <span class="co">// メインスレッド</span></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>  label1.<span class="fu">Text</span> = result; <span class="co">// メインスレッド</span></span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>async Task&lt;<span class="dt">string</span>&gt; <span class="fu">ReadFileAsStringAsync</span>(<span class="dt">string</span> filename)</span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>{</span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>  Debug.<span class="fu">WriteLine</span>($<span class="st">&quot;ファイルを読み込みます: {filename}&quot;</span>); <span class="co">// ① // メインスレッド</span></span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a>  <span class="dt">var</span> result = await File.<span class="fu">ReadAllTextAsync</span>(filename); <span class="co">// ② // どこかのスレッド</span></span>
+<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a>  Debug.<span class="fu">WriteLine</span>($<span class="st">&quot;ファイル読み込み完了: {filename}&quot;</span>); <span class="co">// ③ // メインスレッド</span></span>
+<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a>  <span class="kw">return</span> result;</span>
+<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<p>今回はGUIアプリケーションを想定してますので、<code>await</code>の後(③)も<code>SynchronizationContext</code>の働きによりメインスレッドで実行されます。 さて、これだけではまだデッドロックは見えてきませんね……。 ところで<code>await</code>と同等のコードはどうなっているんでしたっけ？というところを見ていきましょう。</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode cs"><code class="sourceCode cs"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="dt">void</span> <span class="fu">Button1_Click</span>(<span class="dt">object</span> sender, EventArgs e)</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>{</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>  <span class="dt">string</span> result = <span class="fu">ReadFileAsStringAsync</span>(<span class="st">&quot;hoge.txt&quot;</span>).<span class="fu">Result</span>;</span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>  label1.<span class="fu">Text</span> = result;</span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>Task&lt;<span class="dt">string</span>&gt; <span class="fu">ReadFileAsStringAsync</span>(<span class="dt">string</span> filename)</span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>{</span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>  Debug.<span class="fu">WriteLine</span>($<span class="st">&quot;ファイルを読み込みます: {filename}&quot;</span>);</span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>  Task&lt;<span class="dt">string</span>&gt; resultTask = File.<span class="fu">ReadAllTextAsync</span>(filename).<span class="fu">ContinueWith</span>(prev =&gt; {</span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a>    <span class="dt">string</span> result = prev.<span class="fu">result</span>;</span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a>    Debug.<span class="fu">WriteLine</span>($<span class="st">&quot;ファイル読み込み完了: {filename}&quot;</span>);</span>
+<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a>    <span class="kw">return</span> prev.<span class="fu">result</span>;</span>
+<span id="cb9-16"><a href="#cb9-16" aria-hidden="true" tabindex="-1"></a>  });</span>
+<span id="cb9-17"><a href="#cb9-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-18"><a href="#cb9-18" aria-hidden="true" tabindex="-1"></a>  <span class="kw">return</span> resultTask;</span>
+<span id="cb9-19"><a href="#cb9-19" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<p><code>ContinueWith()</code>で後の処理をつなげたのと同じような動作をするのでした。ただこれだけだと<code>SynchronizationContext</code>の処理が足りてないので実際はもうちょっと複雑になります。</p>
+<div class="sourceCode" id="cb10"><pre class="sourceCode cs"><code class="sourceCode cs"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="dt">void</span> <span class="fu">Button1_Click</span>(<span class="dt">object</span> sender, EventArgs e)</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>{</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>  <span class="dt">string</span> result = <span class="fu">ReadFileAsStringAsync</span>(<span class="st">&quot;hoge.txt&quot;</span>).<span class="fu">Result</span>;</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>  label1.<span class="fu">Text</span> = result;</span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>Task&lt;<span class="dt">string</span>&gt; <span class="fu">ReadFileAsStringAsync</span>(<span class="dt">string</span> filename)</span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>{</span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>  <span class="dt">var</span> syncContext = SynchronizationContext.<span class="fu">Current</span>; <span class="co">//ここで呼び出された時点のSynchronizationContextを取得しておく</span></span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a>  Debug.<span class="fu">WriteLine</span>($<span class="st">&quot;ファイルを読み込みます: {filename}&quot;</span>);</span>
+<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-13"><a href="#cb10-13" aria-hidden="true" tabindex="-1"></a>  Task&lt;Task&lt;<span class="dt">string</span>&gt;&gt; resultTask = File.<span class="fu">ReadAllTextAsync</span>(filename).<span class="fu">ContinueWith</span>(prev =&gt; {</span>
+<span id="cb10-14"><a href="#cb10-14" aria-hidden="true" tabindex="-1"></a>    TaskCompletionSource tcs = <span class="kw">new</span> <span class="fu">TaskCompletionSource</span>();</span>
+<span id="cb10-15"><a href="#cb10-15" aria-hidden="true" tabindex="-1"></a>    syncContext.<span class="fu">Post</span>(state =&gt; { <span class="co">//Form.BeginInvoke()とだいたい同じ</span></span>
+<span id="cb10-16"><a href="#cb10-16" aria-hidden="true" tabindex="-1"></a>      <span class="dt">string</span> result = prev.<span class="fu">result</span>;</span>
+<span id="cb10-17"><a href="#cb10-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-18"><a href="#cb10-18" aria-hidden="true" tabindex="-1"></a>      Debug.<span class="fu">WriteLine</span>.<span class="fu">Write</span>($<span class="st">&quot;ファイル読み込み完了: {filename}&quot;</span>);</span>
+<span id="cb10-19"><a href="#cb10-19" aria-hidden="true" tabindex="-1"></a>      tcs.<span class="fu">SetResult</span>(result);</span>
+<span id="cb10-20"><a href="#cb10-20" aria-hidden="true" tabindex="-1"></a>    }, <span class="kw">null</span>);</span>
+<span id="cb10-21"><a href="#cb10-21" aria-hidden="true" tabindex="-1"></a>    <span class="kw">return</span> tsc.<span class="fu">Task</span>;</span>
+<span id="cb10-22"><a href="#cb10-22" aria-hidden="true" tabindex="-1"></a>  });</span>
+<span id="cb10-23"><a href="#cb10-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-24"><a href="#cb10-24" aria-hidden="true" tabindex="-1"></a>  <span class="kw">return</span> resultTask.<span class="fu">Unwrap</span>();</span>
+<span id="cb10-25"><a href="#cb10-25" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<p>複雑になりましたが、③の処理が<code>Form.BeginInvoke()</code>したのと同じように実行されるのがわかれば充分です。ちょっと整理してみましょう。</p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode cs"><code class="sourceCode cs"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="dt">void</span> <span class="fu">button1_Click</span>(<span class="dt">object</span> sender, EventArgs e)</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>{</span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>  Debug.<span class="fu">WriteLine</span>(<span class="st">&quot;ファイルを読み込みます: hoge.txt&quot;</span>);</span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>  Task&lt;<span class="dt">string</span>&gt; resultTask = File.<span class="fu">ReadAllTextAsync</span>(filename).<span class="fu">ContinueWith</span>(prev =&gt; {</span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>    TaskCompletionSource tcs = <span class="kw">new</span> <span class="fu">TaskCompletionSource</span>();</span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a>    <span class="kw">this</span>.<span class="fu">BeginInvoke</span>(() =&gt; {</span>
+<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a>      <span class="dt">string</span> result = prev.<span class="fu">result</span>;</span>
+<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-11"><a href="#cb11-11" aria-hidden="true" tabindex="-1"></a>      Debug.<span class="fu">WriteLine</span>(<span class="st">&quot;ファイル読み込み完了: hoge.txt&quot;</span>); <span class="co">// α</span></span>
+<span id="cb11-12"><a href="#cb11-12" aria-hidden="true" tabindex="-1"></a>      tcs.<span class="fu">SetResult</span>(result);</span>
+<span id="cb11-13"><a href="#cb11-13" aria-hidden="true" tabindex="-1"></a>    });</span>
+<span id="cb11-14"><a href="#cb11-14" aria-hidden="true" tabindex="-1"></a>    <span class="kw">return</span> tsc.<span class="fu">Task</span>;</span>
+<span id="cb11-15"><a href="#cb11-15" aria-hidden="true" tabindex="-1"></a>  }).<span class="fu">Unwrap</span>();</span>
+<span id="cb11-16"><a href="#cb11-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-17"><a href="#cb11-17" aria-hidden="true" tabindex="-1"></a>  resultTask.<span class="fu">Wait</span>(); <span class="co">// β</span></span>
+<span id="cb11-18"><a href="#cb11-18" aria-hidden="true" tabindex="-1"></a>  <span class="dt">string</span> result = resultTask.<span class="fu">Result</span>;</span>
+<span id="cb11-19"><a href="#cb11-19" aria-hidden="true" tabindex="-1"></a>  label1.<span class="fu">Text</span> = result;</span>
+<span id="cb11-20"><a href="#cb11-20" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<p>これでデッドロックの例とほぼ同じ動きになります。 <code>resultTask</code> は「ファイル読み込み完了」のデバッグメッセージ表示(α)をメインスレッドで実行して完了となるタスクです。 一方βの行はどのスレッドで実行されるでしょうか。もちろんメインスレッドですね。メインスレッドでタスクの完了を同期待ちします。</p>
+<p>気になるのは、「「デバッグメッセージ表示(α)をメインスレッドで実行して完了となるタスク」をメインスレッドで同期で待っている(β)」ことです。 <code>Form.BeginInvoke()</code>で指定した処理(α)はいつ実行されるのでしょうか？これはイベントハンドラの処理が行なわれていない時、つまり<code>button1_Click</code>が終わってからです。 しかしβはαが終わるのを待っており<code>button1_Click</code>は当然βが終わらないと終わりません。<code>button1_Click</code>が終わるには<code>α</code>が終わらないといけないのですが、<code>α</code>が終わるには<code>button1_Click</code>が終わらないといけません。おおっと、デッドロック。</p>
+<p>順を追って見てみますと……</p>
+<ol type="1">
+<li>メインスレッドが<code>button1_Click</code>を呼び出す。</li>
+<li>「ファイルを読み込みます」のデバッグメッセージを表示する。</li>
+<li>ファイルの読み込みの処理を非同期で開始する。</li>
+<li>ファイル読み込みの非同期処理にメインスレッドで「ファイル読み込み完了」のデバッグメッセージを表示する処理(α)を追加する。</li>
+<li>ファイル読み込みとメインスレッドで「ファイル読み込み完了」のデバッグメッセージを表示する処理(α)が終わるのを待ちます。</li>
+<li>いつかファイル読み込みが完了します。</li>
+<li>ファイル読み込み処理に追加された、メインスレッドで「ファイル読み込み完了」のデバッグメッセージを表示する処理(α)が実行されようとしますが、メインスレッドでは<code>button1_Click()</code>が実行中なので終わるまで待ちます。</li>
+<li>メインスレッドの<code>button1_Click</code>ではαが終わるのを待っています。</li>
+<li>互いに待ちあってデッドロック！</li>
+</ol>
+<figure>
+<img src="dotnetasync3.png" alt="デッドロックの図" /><figcaption aria-hidden="true">デッドロックの図</figcaption>
+</figure>
+<!--
+@startuml
+メインスレッド -> button1_Click
+button1_Click -> ファイル読み込みタスク : ReadAllTextAsync
+button1_Click -> button1_Click : Task.Resultで完了待ち
+ファイル読み込みタスク ->x メインスレッド : 完了メッセージ表示
+ファイル読み込みタスク ->x button1_Click : タスク完了
+button1_Click -> メインスレッド : メソッド終了
+@enduml
+-->
+<p>GUIアプリケーションで<code>Task</code>の同期待ちをしてしまうと、このように簡単にデッドロックに陥ってしまいます。書くのは簡単なのに原因はコードからわかりづらいのが最悪ですね。</p>
+<p>回避策としては<code>Task</code>は全部<code>await</code>で待てばいいんですが、どうしてそうなるのか見てみましょう。</p>
+<div class="sourceCode" id="cb12"><pre class="sourceCode cs"><code class="sourceCode cs"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>async <span class="dt">void</span> <span class="fu">button1_Click</span>(<span class="dt">object</span> sender, EventArgs e)</span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>{</span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>  <span class="dt">string</span> result = await <span class="fu">ReadFileAsStringAsync</span>(<span class="st">&quot;hoge.txt&quot;</span>);</span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>  label1.<span class="fu">Text</span> = result;</span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>Task&lt;<span class="dt">string</span>&gt; <span class="fu">ReadFileAsStringAsync</span>(<span class="dt">string</span> filename)</span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>{</span>
+<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a>  Debug.<span class="fu">WriteLine</span>($<span class="st">&quot;ファイルを読み込みます: {filename}&quot;</span>);</span>
+<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a>  <span class="dt">var</span> result = await File.<span class="fu">ReadAllTextAsync</span>(filename);</span>
+<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a>  Debug.<span class="fu">WriteLine</span>.<span class="fu">Write</span>($<span class="st">&quot;ファイル読み込み完了: {filename}&quot;</span>);</span>
+<span id="cb12-14"><a href="#cb12-14" aria-hidden="true" tabindex="-1"></a>  <span class="kw">return</span> result;</span>
+<span id="cb12-15"><a href="#cb12-15" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<p>これが回避した版です。<code>button1_Click()</code>では<code>ReadFileAsStringAsync().Result</code>でなく<code>await ReadFileAsStringAsync()</code>で待つようにしただけです。これを同等のコードに展開してみるとどうなるでしょうか。</p>
+<div class="sourceCode" id="cb13"><pre class="sourceCode cs"><code class="sourceCode cs"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="dt">void</span> <span class="fu">button1_Click</span>(<span class="dt">object</span> sender, EventArgs e)</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>{</span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>  Debug.<span class="fu">WriteLine</span>(<span class="st">&quot;ファイルを読み込みます: hoge.txt&quot;</span>);</span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>  Task&lt;<span class="dt">string</span>&gt; resultTask = File.<span class="fu">ReadAllTextAsync</span>(filename).<span class="fu">ContinueWith</span>(prev =&gt; {</span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>    TaskCompletionSource tcs = <span class="kw">new</span> <span class="fu">TaskCompletionSource</span>();</span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a>    <span class="kw">this</span>.<span class="fu">BeginInvoke</span>(() =&gt; {</span>
+<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a>      <span class="dt">string</span> result = prev.<span class="fu">result</span>;</span>
+<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a>      Debug.<span class="fu">WriteLine</span>.<span class="fu">Write</span>(<span class="st">&quot;ファイル読み込み完了: hoge.txt&quot;</span>); <span class="co">// α</span></span>
+<span id="cb13-12"><a href="#cb13-12" aria-hidden="true" tabindex="-1"></a>      tcs.<span class="fu">SetResult</span>(result);</span>
+<span id="cb13-13"><a href="#cb13-13" aria-hidden="true" tabindex="-1"></a>    });</span>
+<span id="cb13-14"><a href="#cb13-14" aria-hidden="true" tabindex="-1"></a>    <span class="kw">return</span> tsc.<span class="fu">Task</span>;</span>
+<span id="cb13-15"><a href="#cb13-15" aria-hidden="true" tabindex="-1"></a>  }).<span class="fu">Unwrap</span>();</span>
+<span id="cb13-16"><a href="#cb13-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-17"><a href="#cb13-17" aria-hidden="true" tabindex="-1"></a>  resultTask.<span class="fu">ContinueWith</span>(prev =&gt; { <span class="co">// β</span></span>
+<span id="cb13-18"><a href="#cb13-18" aria-hidden="true" tabindex="-1"></a>    <span class="kw">this</span>.<span class="fu">BeginInvoke</span>(() =&gt; {</span>
+<span id="cb13-19"><a href="#cb13-19" aria-hidden="true" tabindex="-1"></a>      label1.<span class="fu">Text</span> = result; <span class="co">// γ</span></span>
+<span id="cb13-20"><a href="#cb13-20" aria-hidden="true" tabindex="-1"></a>    });</span>
+<span id="cb13-21"><a href="#cb13-21" aria-hidden="true" tabindex="-1"></a>  });</span>
+<span id="cb13-22"><a href="#cb13-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-23"><a href="#cb13-23" aria-hidden="true" tabindex="-1"></a>  <span class="co">// δ</span></span>
+<span id="cb13-24"><a href="#cb13-24" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<p>βとして以前は待っていたところが<code>ContinueWith()</code>に置き換わりました。<code>ContinueWith()</code>は前の<code>Task</code>が終わったら実行してくれる処理を追加するメソッドです。<code>ContinueWith()</code>自体は待ったりせずに処理を登録したらすぐに返ってくることに気をつけてください。つまりβは一瞬で終わります。</p>
+<p>この処理の流れは次のようになります。</p>
+<ol type="1">
+<li>「ファイルを読み込みます」のデバッグメッセージを表示する。</li>
+<li>ファイルの読み込みの処理を非同期で開始する。</li>
+<li>ファイル読み込みの非同期処理にメインスレッドで「ファイル読み込み完了」のデバッグメッセージを表示する処理(α)を追加する。</li>
+<li>ファイル読み込みとメインスレッドで「ファイル読み込み完了」のデバッグメッセージを表示する処理(α)が終わったら、メインスレッドで結果をラベルに表示する処理(γ)を追加する(β)。</li>
+<li>非同期処理の終了待ちはしないので<code>button1_Click</code>が終了する(δ)。メインスレッドが空く。</li>
+<li>非同期処理は続くのでいつかファイル読み込みが完了する。</li>
+<li>ファイル読み込み処理に追加された、メインスレッドで「ファイル読み込み完了」のデバッグメッセージを表示する処理(α)が実行される。αがすぐ終わるのでメインスレッドが空く。</li>
+<li>ファイル読み込みとメインスレッドで「ファイル読み込み完了」のデバッグメッセージを表示する処理(α)に追加された、メインスレッドで結果をラベルに表示する処理(γ)が実行される。γもすぐ終わるのでメインスレッドが空く。</li>
+</ol>
+<p>今度は<code>button1_Click</code>が非同期処理の完了を待たずして終わるためメインスレッドがすぐ空き、次のメインスレッドで何かする処理が実行できます。そしてそれらもすぐ終わるため、いつもメインスレッドはすぐに他の処理を実行することができます。</p>
+<h2 id="gui以外はでデッドロックしない">GUI以外はでデッドロックしない？</h2>
+<p>GUIアプリでは <code>await</code> と <code>Task.Result</code> や <code>Task.Wait()</code> を混ぜて使うと簡単にデッドロックしてしまうのがわかりました。 では、GUIアプリ以外ではどうなるのでしょうか？</p>
+<p>GUIアプリ以外ではわざわざ<code>SynchronizationContext.Current</code>を設定しない限りはこの値は<code>null</code>になっていてデフォルトの<code>SynchronizationContext</code>が使われます。 デフォルトの<code>SynchronizationContext</code>は<code>SynchronizationContext.Post()</code>で渡された処理をスレッドプールで実行します。 メインスレッドを待たずにどこかのスレッドで勝手に実行するのでデッドロックはそう簡単に起きません。よかったね。</p>
+<p>逆に言うと<code>await</code>の前後で実行されるスレッドが変わる可能性がある(高い)ことに気をつけてください。</p>
+<pre><code>async Task&lt;string&gt; ReadFileAsStringAsync(string filename)
+{
+  Debug.WriteLine($&quot;ファイルを読み込みます: {filename}&quot;); // ① // メイン(呼び出し元の)スレッド
+
+  var result = await File.ReadAllTextAsync(filename); // ② // どこかのスレッド
+  
+  Debug.WriteLine($&quot;ファイル読み込み完了: {filename}&quot;); // ③ // GUIアプリ以外ではどこかのスレッド
+  return result;
+}</code></pre>
+<p>こうなります。GUIアプリではメインスレッドで実行されていた③が、どこかのスレッドで実行されます。 ここに呼び出し元と同じスレッドで実行されることを期待するようなコードを書いてしまうと、デッドロックやデータの一貫性が失なわれるなどおかしなことになる可能性があることに気をつけましょう。</p>
+<h2 id="呼び出し元を気にせずawaitしたい">呼び出し元を気にせず<code>await</code>したい</h2>
+<p><code>await</code>の後のスレッドがメインスレッドで実行されるかどうかわからない件ですが、<code>Task.ConfigureAwait(false)</code>を呼び出すことで回避することができます。 これを呼び出すと<code>SynchronizationContext</code>を使わなくなるので、呼び出し元がGUIアプリケーションかどうかにかかわらず常にどこかのスレッドで実行されます。</p>
+<pre><code>async Task&lt;string&gt; ReadFileAsStringAsync(string filename)
+{
+  Debug.WriteLine($&quot;ファイルを読み込みます: {filename}&quot;); // ① // メイン(呼び出し元の)スレッド
+
+  var result = await File.ReadAllTextAsync(filename).ConfigureAwait(false); // ② // どこかのスレッド
+  
+  Debug.WriteLine($&quot;ファイル読み込み完了: {filename}&quot;); // ③ // どこかのスレッド(②と同じことが多い)
+  return result;
+}</code></pre>
+<p>どういう時に使うかというと、<code>await</code>の後がどこで実行されてもかまわないという時に使うと、わざわざ<code>SynchronizationContext</code>に処理を投げなくなるので微妙に速くなります。 まあアプリケーションではあまり気にすることもないので普通には使わなくて良いでしょう。 使われているところがあった時に見てわかればいいかなという程度で。</p>
+<h1 id="おわり">おわり</h1>
+<p>今回は <code>async/await</code> の使い方と、気をつけないとなぜかデッドロックが起きる話をしました。 だいたいこれが分かってればC#の <code>async/await</code> は怖くないはずです。</p>
+<p>とりあえず非同期処理の紹介としてはこのくらいで終わらせておきます。</p>
+<p>本当は <code>async stream</code> なんかも紹介できればよかったんですが、かなり複雑な話なのと、もう3回もやって飽きてきたので一旦切り上げます。 たぶんもっとわかりやすい詳しい話はどこか探せばきっとあるのでまあいいよね。</p>
+</body>
+</html>
